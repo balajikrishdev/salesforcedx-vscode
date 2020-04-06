@@ -5,9 +5,12 @@
  * For full license text, see LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-import { Connection } from '@salesforce/core';
 import { ContinueResponse } from '@salesforce/salesforcedx-utils-vscode/out/src/types';
-import { ToolingDeployResult } from '@salesforce/source-deploy-retrieve';
+import {
+  SourceClient,
+  ToolingDeployResult
+} from '@salesforce/source-deploy-retrieve';
+import { ApiResult } from '@salesforce/source-deploy-retrieve/lib/client/client';
 import { ProgressLocation, window } from 'vscode';
 import { channelService } from '../../channels';
 import { ToolingDeployParser } from '../../deploys';
@@ -20,7 +23,7 @@ import { CommandletExecutor } from './sfdxCommandlet';
 export abstract class LibraryCommandletExecutor<T>
   implements CommandletExecutor<T> {
   protected showChannelOutput = true;
-  protected orgConnection: Connection | undefined;
+  protected sourceClient: SourceClient | undefined;
   protected executionName: string = '';
   protected startTime: [number, number] | undefined;
   protected telemetryName: string | undefined;
@@ -38,7 +41,32 @@ export abstract class LibraryCommandletExecutor<T>
     if (!usernameOrAlias) {
       throw new Error(nls.localize('error_no_default_username'));
     }
-    this.orgConnection = await OrgAuthInfo.getConnection(usernameOrAlias);
+    const conn = await OrgAuthInfo.getConnection(usernameOrAlias);
+    this.sourceClient = new SourceClient(conn, '48.0');
+  }
+
+  public retrieveWrapper(fn: (...args: any[]) => Promise<ApiResult>) {
+    const commandName = this.executionName;
+
+    return async function(...args: any[]): Promise<ApiResult> {
+      channelService.showCommandWithTimestamp(`Starting ${commandName}`);
+
+      const result = await window.withProgress(
+        {
+          title: commandName,
+          location: ProgressLocation.Notification
+        },
+        async () => {
+          // @ts-ignore
+          return (await fn.call(this, ...args)) as ApiResult;
+        }
+      );
+
+      channelService.appendLine('Library result =>' + JSON.stringify(result));
+      channelService.showCommandWithTimestamp(`Finished ${commandName}`);
+      await notificationService.showSuccessfulExecution(commandName);
+      return result;
+    };
   }
 
   public deployWrapper(fn: (...args: any[]) => Promise<ToolingDeployResult>) {
