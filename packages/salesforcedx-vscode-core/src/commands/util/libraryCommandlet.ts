@@ -5,12 +5,13 @@
  * For full license text, see LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
+import { Connection } from '@salesforce/core';
 import { ContinueResponse } from '@salesforce/salesforcedx-utils-vscode/out/src/types';
 import {
+  ApiResult,
   SourceClient,
   ToolingDeployResult
 } from '@salesforce/source-deploy-retrieve';
-import { ApiResult } from '@salesforce/source-deploy-retrieve/lib/client/client';
 import { ProgressLocation, window } from 'vscode';
 import { channelService } from '../../channels';
 import { ToolingDeployParser } from '../../deploys';
@@ -23,6 +24,7 @@ import { CommandletExecutor } from './sfdxCommandlet';
 export abstract class LibraryCommandletExecutor<T>
   implements CommandletExecutor<T> {
   protected showChannelOutput = true;
+  protected orgConnection: Connection | undefined;
   protected sourceClient: SourceClient | undefined;
   protected executionName: string = '';
   protected startTime: [number, number] | undefined;
@@ -41,8 +43,9 @@ export abstract class LibraryCommandletExecutor<T>
     if (!usernameOrAlias) {
       throw new Error(nls.localize('error_no_default_username'));
     }
-    const conn = await OrgAuthInfo.getConnection(usernameOrAlias);
-    this.sourceClient = new SourceClient(conn, '48.0');
+
+    this.orgConnection = await OrgAuthInfo.getConnection(usernameOrAlias);
+    this.sourceClient = new SourceClient(this.orgConnection);
   }
 
   public retrieveWrapper(fn: (...args: any[]) => Promise<ApiResult>) {
