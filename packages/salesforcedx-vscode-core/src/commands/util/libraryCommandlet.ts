@@ -19,6 +19,7 @@ import { nls } from '../../messages';
 import { notificationService } from '../../notifications';
 import { TelemetryData, telemetryService } from '../../telemetry';
 import { OrgAuthInfo } from '../../util';
+import { outputRetrieveTable } from './retrieveParser';
 import { CommandletExecutor } from './sfdxCommandlet';
 
 export abstract class LibraryCommandletExecutor<T>
@@ -44,6 +45,8 @@ export abstract class LibraryCommandletExecutor<T>
       throw new Error(nls.localize('error_no_default_username'));
     }
 
+    // TODO: this.orgConnection will be deprecated in favor of using sourceClient
+    // in version 1.0.6 of the library
     this.orgConnection = await OrgAuthInfo.getConnection(usernameOrAlias);
     this.sourceClient = new SourceClient(this.orgConnection);
   }
@@ -65,7 +68,7 @@ export abstract class LibraryCommandletExecutor<T>
         }
       );
 
-      channelService.appendLine('Library result =>' + JSON.stringify(result));
+      channelService.appendLine(outputRetrieveTable(result));
       channelService.showCommandWithTimestamp(`Finished ${commandName}`);
       await notificationService.showSuccessfulExecution(commandName);
       return result;
